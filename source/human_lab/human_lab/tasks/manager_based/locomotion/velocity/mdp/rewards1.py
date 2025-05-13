@@ -15,16 +15,17 @@ if TYPE_CHECKING:
     from isaaclab.envs import ManagerBasedRLEnv
 
 
-def track_lin_vel_xy_yaw_frame_exp1(env: ManagerBasedRLEnv, std: float, asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")) -> torch.Tensor:
+def track_lin_vel_xy_yaw_frame_exp1(env: ManagerBasedRLEnv, std: float, command_name: str, asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")) -> torch.Tensor:
     asset: Articulation = env.scene[asset_cfg.name]
     vel_yaw = math_utils.quat_rotate_inverse(math_utils.yaw_quat(asset.data.root_quat_w), asset.data.root_lin_vel_w[:, :3])
-    lin_vel_error = torch.sum(torch.square(env.command_generator.command[:, :2] - vel_yaw[:, :2]), dim=1)
+    lin_vel_error = torch.sum(
+        torch.square(env.command_manager.get_command(command_name)[:, :2] - vel_yaw[:, :2]), dim=1)
     return torch.exp(-lin_vel_error / std**2)
 
 
-def track_ang_vel_z_world_exp1(env: ManagerBasedRLEnv, std: float, asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")) -> torch.Tensor:
+def track_ang_vel_z_world_exp1(env: ManagerBasedRLEnv, std: float, command_name: str, asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")) -> torch.Tensor:
     asset: Articulation = env.scene[asset_cfg.name]
-    ang_vel_error = torch.square(env.command_generator.command[:, 2] - asset.data.root_ang_vel_w[:, 2])
+    ang_vel_error = torch.square(env.command_manager.get_command(command_name)[:, 2] - asset.data.root_ang_vel_w[:, 2])
     return torch.exp(-ang_vel_error / std**2)
 
 
@@ -50,7 +51,9 @@ def joint_acc_l21(env: ManagerBasedRLEnv, asset_cfg: SceneEntityCfg = SceneEntit
 
 
 def action_rate_l21(env: ManagerBasedRLEnv) -> torch.Tensor:
-    return torch.sum(torch.square(env.action_buffer._circular_buffer.buffer[:, -1, :] - env.action_buffer._circular_buffer.buffer[:, -2, :]), dim=1)
+    return torch.sum(torch.square(env.action_manager.action - env.action_manager.prev_action), dim=1)
+
+    # return torch.sum(torch.square(env.action_buffer._circular_buffer.buffer[:, -1, :] - env.action_buffer._circular_buffer.buffer[:, -2, :]), dim=1)
 
 
 def undesired_contacts1(env: ManagerBasedRLEnv, threshold: float, sensor_cfg: SceneEntityCfg) -> torch.Tensor:
@@ -74,10 +77,10 @@ def flat_orientation_l21(env: ManagerBasedRLEnv, asset_cfg: SceneEntityCfg = Sce
 
 def is_terminated1(env: ManagerBasedRLEnv) -> torch.Tensor:
     """Penalize terminated episodes that don't correspond to episodic timeouts."""
-    return env.reset_buf * ~env.time_out_buf
+    return env.termination_manager.terminated.float()
 
 
-def feet_air_time_positive_biped1(env: ManagerBasedRLEnv, threshold: float, sensor_cfg: SceneEntityCfg) -> torch.Tensor:
+def feet_air_time_positive_biped1(env: ManagerBasedRLEnv, command_name: str, threshold: float, sensor_cfg: SceneEntityCfg) -> torch.Tensor:
     contact_sensor: ContactSensor = env.scene.sensors[sensor_cfg.name]
     air_time = contact_sensor.data.current_air_time[:, sensor_cfg.body_ids]
     contact_time = contact_sensor.data.current_contact_time[:, sensor_cfg.body_ids]
@@ -87,7 +90,7 @@ def feet_air_time_positive_biped1(env: ManagerBasedRLEnv, threshold: float, sens
     reward = torch.min(torch.where(single_stance.unsqueeze(-1), in_mode_time, 0.0), dim=1)[0]
     reward = torch.clamp(reward, max=threshold)
     # no reward for zero command
-    reward *= (torch.norm(env.command_generator.command[:, :2], dim=1) + torch.abs(env.command_generator.command[:, 2])) > 0.1
+    reward *= (torch.norm(env.command_manager.get_command(command_name)[:, :2], dim=1) + torch.abs(env.command_manager.get_command(command_name)[:, 2])) > 0.1
     return reward
 
 
