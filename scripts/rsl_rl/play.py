@@ -22,7 +22,7 @@ parser.add_argument(
     "--disable_fabric", action="store_true", default=False, help="Disable fabric and use USD I/O operations."
 )
 parser.add_argument("--num_envs", type=int, default=None, help="Number of environments to simulate.")
-parser.add_argument("--task", type=str, default=None, help="Name of the task.")
+parser.add_argument("--task", type=str, default="Isaac-Velocity-Rough-G1-Play-v2", help="Name of the task.")
 parser.add_argument(
     "--use_pretrained_checkpoint",
     action="store_true",
@@ -50,6 +50,7 @@ import time
 import torch
 
 from human_lab.third_party.rsl_rl.runners import OnPolicyRunner
+
 
 from isaaclab.envs import DirectMARLEnv, multi_agent_to_single_agent
 from isaaclab.utils.assets import retrieve_file_path
@@ -120,11 +121,23 @@ def main():
 
     # export policy to onnx/jit
     export_model_dir = os.path.join(os.path.dirname(resume_path), "exported")
+    # export_policy_as_jit(
+    #     ppo_runner.alg.actor_critic, 
+    #     ppo_runner.obs_normalizer, 
+    #     path=export_model_dir, 
+    #     filename="policy.pt"
+    # )
     export_policy_as_jit(
-        ppo_runner.alg.actor_critic, ppo_runner.obs_normalizer, path=export_model_dir, filename="policy.pt"
+        ppo_runner.alg.policy, 
+        ppo_runner.obs_normalizer, 
+        path=export_model_dir, 
+        filename="policy.pt"
     )
     export_policy_as_onnx(
-        ppo_runner.alg.actor_critic, normalizer=ppo_runner.obs_normalizer, path=export_model_dir, filename="policy.onnx"
+        ppo_runner.alg.policy, 
+        normalizer=ppo_runner.obs_normalizer, 
+        path=export_model_dir, 
+        filename="policy.onnx"
     )
 
     dt = env.unwrapped.physics_dt

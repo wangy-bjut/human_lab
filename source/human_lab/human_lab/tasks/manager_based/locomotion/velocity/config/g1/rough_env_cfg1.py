@@ -86,8 +86,11 @@ class G1RoughEnvCfg(LocomotionVelocityRoughEnvCfg):
         }
 
         # Rewards
-
-
+        self.rewards.track_lin_vel_xy_exp.weight = 1.5
+        self.rewards.track_ang_vel_z_exp.weight = 1.5
+        self.rewards.lin_vel_z_l2.weight = -0.25
+        
+        
         # Commands
         self.commands.base_velocity.ranges.lin_vel_x = (0.0, 1.0)
         self.commands.base_velocity.ranges.lin_vel_y = (-0.0, 0.0)
